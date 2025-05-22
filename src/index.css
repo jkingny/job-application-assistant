@@ -1,0 +1,237 @@
+/* ───────── Base layout ───────── */
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.2s ease, color 0.2s ease;   /* smooth theme switch */
+}
+
+.app-layout {
+  display: flex;
+  height: 100vh;
+}
+
+/* ───────── Sidebar ───────── */
+.sidebar {
+  width: 400px;                 /* Increased from 360px for more space */
+  background: var(--sidebar-bg);
+  border-right: 1px solid #c0c0c0;
+  padding: 1rem;
+  overflow-y: auto;
+  position: relative;           /* For proper child positioning */
+  color: var(--sidebar-text);
+}
+
+.sidebar h2 {
+  color: var(--sidebar-text);
+  margin-bottom: 1.5rem;
+}
+
+/* Job list container */
+.job-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Job item styling */
+.job-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  margin-bottom: 12px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  color: var(--sidebar-text);
+}
+
+.job-item.dragging {
+  background-color: var(--sidebar-bg);
+  box-shadow: 0 5px 15px var(--drag-shadow);
+  opacity: 0.9;
+  z-index: 1;
+}
+
+/* Dropzone indicator styling */
+.dropzone-indicator {
+  height: 2px;
+  background: transparent;
+  margin: 0;
+  transition: all 0.2s ease;
+  pointer-events: none;
+}
+
+.dropzone-indicator.active {
+  height: 20px;
+  margin: 8px 0;
+  background: var(--progress-bar);
+  border-radius: 6px;
+  opacity: 0.3;
+}
+
+/* Drag handle styling */
+.drag-handle {
+  color: #ffffff;  /* White color for drag handle */
+  opacity: 0.5;
+  cursor: grab;
+  padding: 8px 4px;
+  margin-left: -4px;           /* Align with sidebar padding */
+  touch-action: none;
+  transition: opacity 0.2s ease;
+}
+
+.drag-handle:hover {
+  opacity: 0.8;
+}
+
+/* Progress bar styles */
+.progress-container {
+  width: 100%; /* Keep it full width */
+  height: 12px; /* Increase height for better visibility */
+  background: #d0d0d0; /* Neutral track color */
+  border-radius: 6px; /* Slightly rounded corners */
+  margin-top: 4px;
+  position: relative; /* Ensure percentage text is positioned correctly */
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--progress-bar);
+  border-radius: 6px; /* Match container's rounded corners */
+  transition: width 0.2s ease; /* Smooth animation for progress changes */
+  will-change: width;
+}
+
+/* Percentage text inside the progress bar */
+.progress-container span {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 0.85rem; /* Slightly larger font for readability */
+  font-weight: bold;
+  color: #333333;  /* Dark text for progress percentage */
+  pointer-events: none; /* Prevent interaction with the text */
+}
+
+/* ───────── Main content ───────── */
+.main-content {
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+.container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+/* ───────── Job list button ───────── */
+.job-button {
+  flex: 1;                      /* NEW: fills remaining row space */
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  background: var(--job-bg);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background 0.15s ease, all 0.2s ease;
+  will-change: transform;
+  width: 100%;                  /* Expand job-button to match progress bar width */
+  margin: 0;                    /* Remove default margin */
+  min-width: 0;                 /* Allow button to shrink */
+  color: var(--sidebar-text);
+}
+
+.job-button:hover {
+  background: var(--job-hover);
+}
+
+.job-button.selected {
+  background: var(--job-selected);
+  font-weight: 600;
+}
+
+/* Delete button beside each job */
+.delete-button {
+  background: none;
+  border: none;
+  color: #b00;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding-left: 8px;            /* small gap */
+  align-self: stretch;          /* matches job‑button height */
+  display: flex;
+  align-items: center;
+}
+
+/* ───────── Status tags (sidebar & header) ───────── */
+.status-tag {
+  display: block;               /* NEW: own line */
+  font-size: 0.75rem;
+  margin-top: 4px;
+  border-radius: 4px;
+  padding: 2px 6px;
+  color: #fff;
+}
+
+.status-not-started { background:#7f8c8d; }
+.status-applied      { background:#3498db; }
+.status-interviewing { background:#f39c12; }
+.status-offer        { background:#2ecc71; }
+.status-rejected     { background:#e74c3c; }
+
+/* ───────── Checklist “done” text ───────── */
+.done {
+  text-decoration: line-through;
+  color: #777;
+}
+
+
+/* ───────── Theme variables ───────── */
+:root {
+  --bg:            #ffffff;
+  --text:          #333333;          /* Dark text for main content */
+  --sidebar-bg:    #f5f7fa;          /* Slightly cooler background */
+  --job-bg:        #e9ecef;          /* Subtle container background */
+  --job-hover:     #dee2e6;          /* Slightly darker on hover */
+  --job-selected:  #bde0fe;          /* Softer blue for selected state */
+  --progress-bar:  #3498db;          /* Bright blue for progress */
+  --drag-shadow:   rgba(0, 0, 0, 0.1);
+  --sidebar-text:  #ffffff;          /* White text for sidebar */
+  --sidebar-heading: #ffffff;
+  --sidebar-muted: rgba(255, 255, 255, 0.7);
+  transition: all 0.3s ease;
+}
+
+.dark-mode {
+  --bg:            #1a1a1a;          /* Darker background */
+  --text:          #ecf0f1;          /* Lighter, crisp text */
+  --sidebar-bg:    #2d3436;          /* Dark but not too dark */
+  --job-bg:        #343a40;          /* Subtle container background */
+  --job-hover:     #495057;          /* Noticeable hover state */
+  --job-selected:  #0077cc;          /* Vibrant blue for selected */
+  --progress-bar:  #3498db;          /* Keep progress consistent */
+  --drag-shadow:   rgba(0, 0, 0, 0.2);
+  --sidebar-text:  #ffffff;          /* Keep white text in dark mode */
+  --sidebar-heading: #ffffff;
+  --sidebar-muted: rgba(255, 255, 255, 0.7);
+}
+
+/* Ensure input text remains readable */
+.sidebar input,
+.sidebar select {
+  color: #333333;  /* Dark text for form controls */
+  background: #ffffff;
+  border: 1px solid #cccccc;
+  border-radius: 4px;
+  padding: 6px 8px;
+}
+
+/* (Optional) remove old animation classes if present
+.fade-slide-enter, .scale-task-enter,
+.fade-slide-exit, .scale-task-exit { display:none; }
+*/
