@@ -41,7 +41,42 @@ function App() {
 
   const [applications, setApplications] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    return saved ? JSON.parse(saved) : [];
+    const parsed = saved ? JSON.parse(saved) : [];
+    
+    // If no applications exist, create an example one
+    if (parsed.length === 0) {
+      const exampleApp = {
+        id: Date.now().toString(),
+        title: "Example job title",
+        company: "Example company name",
+        date: new Date().toISOString().split('T')[0],
+        checklist: JSON.parse(JSON.stringify(defaultGroupedChecklist)),
+        status: 'Not started',
+        coverLetter: null,
+        resume: null,
+        notes: '',
+        editing: {
+          title: false,
+          company: false,
+          jobReqId: false,
+          jobLink: false
+        },
+        jobReqId: '',
+        jobLink: '',
+        interview: {
+          date: '',
+          time: '',
+          locationType: 'remote',
+          location: {
+            remote: '',
+            inPerson: ''
+          }
+        }
+      };
+      return [exampleApp];
+    }
+    
+    return parsed;
   });
   const [selectedJobId, setSelectedJobId] = useState(null);
   const [newJob, setNewJob] = useState({
