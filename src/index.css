@@ -190,6 +190,71 @@ body {
   color: #777;
 }
 
+/* Calendar Styles */
+.interview-calendar {
+  margin: 24px 0;
+  padding: 20px;
+  background: var(--job-bg);
+  border-radius: 8px;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.interview-card {
+  background: var(--bg);
+  padding: 16px;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px var(--drag-shadow);
+}
+
+.interview-date {
+  font-size: 1.2em;
+  font-weight: bold;
+  color: var(--text);
+}
+
+.interview-time {
+  color: var(--text);
+  margin-top: 4px;
+}
+
+.interview-company {
+  font-weight: 500;
+  margin-top: 8px;
+  color: var(--text);
+}
+
+.interview-title {
+  color: var(--sidebar-muted);
+  font-size: 0.9em;
+  margin-top: 4px;
+}
+
+.interview-type {
+  margin-top: 8px;
+  font-size: 0.9em;
+  color: var(--sidebar-muted);
+}
+
+.calendar-export-btn {
+  background: var(--progress-bar);
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-top: 12px;
+}
+
+.calendar-export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* ───────── Theme variables ───────── */
 :root {

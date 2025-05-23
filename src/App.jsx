@@ -6,6 +6,7 @@ import Checklist, { defaultGroupedChecklist } from './components/Checklist';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import DraggableJob from './components/DraggableJob';
+import { generateInterviewICS } from './utils/calendarExport';
 import './index.css';
 
 const STORAGE_KEY = 'jobApplications';
@@ -13,6 +14,24 @@ const STORAGE_KEY = 'jobApplications';
 const sidebarVariants = {
   hidden: { x: '-100%' },
   visible: { x: 0, transition: { duration: 0.5, ease: 'easeOut' } }
+};
+
+// Update the calculateProgress function
+const calculateProgress = (checklist) => {
+  if (!checklist) return 0;
+  
+  let total = 0;
+  let completed = 0;
+
+  // Count items in each group
+  Object.values(checklist).forEach(group => {
+    group.tasks.forEach(task => {
+      total++;
+      if (task.done) completed++;
+    });
+  });
+
+  return total === 0 ? 0 : Math.round((completed / total) * 100);
 };
 
 function App() {
@@ -71,15 +90,14 @@ function App() {
       ...newJob,
       checklist: JSON.parse(JSON.stringify(defaultGroupedChecklist)),
       status: 'Not started',
-      coverLetter: null,  // Will now store {url, name} object when file is uploaded
-      resume: null,       // Will now store {url, name} object when file is uploaded
+      coverLetter: null,
+      resume: null,
       notes: '',
-      interview: {
-        locationType: 'remote',
-        location: {
-          remote: '',
-          inPerson: ''
-        }
+      editing: {
+        title: false,
+        company: false,
+        jobReqId: false,
+        jobLink: false
       }
     };
     setApplications([...applications, app]);
@@ -116,36 +134,33 @@ function App() {
   const updateStatus = (id, status) =>
     setApplications(applications.map(a => (a.id === id ? { ...a, status } : a)));
 
-  const saveEdit = id => {
+  const saveEdit = (id, field) => {
     setApplications(applications.map(app => {
       if (app.id === id) {
         return {
           ...app,
-          title: app.editTitle !== undefined ? app.editTitle : app.title,
-          company: app.editCompany !== undefined ? app.editCompany : app.company,
-          jobReqId: app.editJobReqId !== undefined ? app.editJobReqId : app.jobReqId,
-          jobLink: app.editJobLink !== undefined ? app.editJobLink : app.jobLink,
-          editTitle: undefined,
-          editCompany: undefined,
-          editJobReqId: undefined,
-          editJobLink: undefined,
-          editing: false
+          [field]: app[`edit${field.charAt(0).toUpperCase() + field.slice(1)}`],
+          [`edit${field.charAt(0).toUpperCase() + field.slice(1)}`]: undefined,
+          editing: {
+            ...app.editing,
+            [field]: false
+          }
         };
       }
       return app;
     }));
   };
 
-  const cancelEdit = id => {
+  const cancelEdit = (id, field) => {
     setApplications(applications.map(app => {
       if (app.id === id) {
         return {
           ...app,
-          editTitle: undefined,
-          editCompany: undefined,
-          editJobReqId: undefined,
-          editJobLink: undefined,
-          editing: false
+          [`edit${field.charAt(0).toUpperCase() + field.slice(1)}`]: undefined,
+          editing: {
+            ...app.editing,
+            [field]: false
+          }
         };
       }
       return app;
@@ -177,8 +192,8 @@ function App() {
         status: app.status,
         jobReqId: app.jobReqId || 'N/A',
         jobLink: app.jobLink || 'N/A',
-        coverLetter: app.coverLetter ? app.coverLetter.name : 'No file uploaded',
-        resume: app.resume ? app.resume.name : 'No file uploaded'
+        coverLetter: app.coverLetter || 'No file uploaded',
+        resume: app.resume || 'No file uploaded'
       });
     });
 
@@ -189,6 +204,16 @@ function App() {
   };
 
   const selectedApp = applications.find(a => a.id === selectedJobId);
+
+  const groupedApplications = {
+    interviewing: applications.filter(app => app.status === 'Interviewing'),
+    applied: applications.filter(app => app.status === 'Applied'),
+    notStarted: applications.filter(app => app.status === 'Not started'),
+    completed: {
+      offer: applications.filter(app => app.status === 'Offer'),
+      rejected: applications.filter(app => app.status === 'Rejected')
+    }
+  };
 
   /* ─── render ─── */
   return (
@@ -235,26 +260,80 @@ function App() {
             items={applications.map(app => app.id)}
             strategy={verticalListSortingStrategy}
           >
-            <ul style={{ listStyle: 'none', padding: 0 }}>
-              {applications.map(app => {
-                const totalTasks = app.checklist.reduce((sum, group) => sum + group.tasks.length, 0);
-                const completedTasks = app.checklist.reduce((sum, group) => sum + group.tasks.filter(task => task.done).length, 0);
-                const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+            {/* Active Applications */}
+            <h3 className="sidebar-section-header">Interviewing ({groupedApplications.interviewing.length})</h3>
+            {groupedApplications.interviewing.map(app => (
+              <DraggableJob
+                key={app.id}
+                id={app.id}
+                app={app}
+                selectedJobId={selectedJobId}
+                onSelect={setSelectedJobId}
+                onDelete={deleteJob}
+                progress={app.checklist ? calculateProgress(app.checklist) : 0}
+                onStatusChange={updateStatus}
+              />
+            ))}
+            
+            <h3 className="sidebar-section-header">Applied ({groupedApplications.applied.length})</h3>
+            {groupedApplications.applied.map(app => (
+              <DraggableJob
+                key={app.id}
+                id={app.id}
+                app={app}
+                selectedJobId={selectedJobId}
+                onSelect={setSelectedJobId}
+                onDelete={deleteJob}
+                progress={app.checklist ? calculateProgress(app.checklist) : 0}
+                onStatusChange={updateStatus}
+              />
+            ))}
+            
+            <h3 className="sidebar-section-header">Not Started ({groupedApplications.notStarted.length})</h3>
+            {groupedApplications.notStarted.map(app => (
+              <DraggableJob
+                key={app.id}
+                id={app.id}
+                app={app}
+                selectedJobId={selectedJobId}
+                onSelect={setSelectedJobId}
+                onDelete={deleteJob}
+                progress={app.checklist ? calculateProgress(app.checklist) : 0}
+                onStatusChange={updateStatus}
+              />
+            ))}
 
-                return (
-                  <DraggableJob
-                    key={app.id}
-                    id={app.id}
-                    app={app}
-                    selectedJobId={selectedJobId}
-                    onSelect={setSelectedJobId}
-                    onDelete={deleteJob}
-                    progress={progress}
-                    onStatusChange={updateStatus}
-                  />
-                );
-              })}
-            </ul>
+            {/* Completed Applications */}
+            <div className="completed-applications">
+              <h3 className="sidebar-section-header">Completed</h3>
+              <h4>Offers ({groupedApplications.completed.offer.length})</h4>
+              {groupedApplications.completed.offer.map(app => (
+                <DraggableJob
+                  key={app.id}
+                  id={app.id}
+                  app={app}
+                  selectedJobId={selectedJobId}
+                  onSelect={setSelectedJobId}
+                  onDelete={deleteJob}
+                  progress={app.checklist ? calculateProgress(app.checklist) : 0}
+                  onStatusChange={updateStatus}
+                />
+              ))}
+              
+              <h4>Rejected ({groupedApplications.completed.rejected.length})</h4>
+              {groupedApplications.completed.rejected.map(app => (
+                <DraggableJob
+                  key={app.id}
+                  id={app.id}
+                  app={app}
+                  selectedJobId={selectedJobId}
+                  onSelect={setSelectedJobId}
+                  onDelete={deleteJob}
+                  progress={app.checklist ? calculateProgress(app.checklist) : 0}
+                  onStatusChange={updateStatus}
+                />
+              ))}
+            </div>
           </SortableContext>
         </DndContext>
 
@@ -290,6 +369,90 @@ function App() {
 
           {selectedApp ? (
             <>
+              <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <label>Job Title:</label>{' '}
+                <div style={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {selectedApp.editing.title ? (
+                    <input
+                      type="text"
+                      value={selectedApp.editTitle ?? selectedApp.title}
+                      onChange={e => setApplications(applications.map(a => 
+                        a.id === selectedApp.id ? { ...a, editTitle: e.target.value } : a
+                      ))}
+                      style={{ flexGrow: 1, padding: '4px 8px' }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') saveEdit(selectedApp.id, 'title');
+                        if (e.key === 'Escape') cancelEdit(selectedApp.id, 'title');
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <span style={{ flexGrow: 1 }}>{selectedApp.title}</span>
+                      <button
+                        onClick={() => setApplications(applications.map(a => 
+                          a.id === selectedApp.id ? {
+                            ...a,
+                            editing: { ...a.editing, title: true }
+                          } : a
+                        ))}
+                        style={{
+                          padding: '4px 8px',
+                          background: '#3498db',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Edit
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <label>Company:</label>{' '}
+                <div style={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {selectedApp.editing.company ? (
+                    <input
+                      type="text"
+                      value={selectedApp.editCompany ?? selectedApp.company}
+                      onChange={e => setApplications(applications.map(a => 
+                        a.id === selectedApp.id ? { ...a, editCompany: e.target.value } : a
+                      ))}
+                      style={{ flexGrow: 1, padding: '4px 8px' }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') saveEdit(selectedApp.id, 'company');
+                        if (e.key === 'Escape') cancelEdit(selectedApp.id, 'company');
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <span style={{ flexGrow: 1 }}>{selectedApp.company}</span>
+                      <button
+                        onClick={() => setApplications(applications.map(a => 
+                          a.id === selectedApp.id ? {
+                            ...a,
+                            editing: { ...a.editing, company: true }
+                          } : a
+                        ))}
+                        style={{
+                          padding: '4px 8px',
+                          background: '#3498db',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Edit
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
               <div style={{ marginBottom: 16 }}>
                 <label>Status:</label>{' '}
                 <select
@@ -316,53 +479,97 @@ function App() {
                 </button>
               </div>
 
-              <div style={{ marginBottom: 16 }}>
+              {/* Job Req ID Section */}
+              <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <label>Job Req ID:</label>{' '}
-                {selectedApp.editing ? (
-                  <input
-                    type="text"
-                    value={selectedApp.editJobReqId ?? selectedApp.jobReqId}
-                    onChange={e => setApplications(applications.map(a => a.id === selectedApp.id ? { ...a, editJobReqId: e.target.value } : a))}
-                    style={{ width: '100%', marginBottom: 5 }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') saveEdit(selectedApp.id);
-                      if (e.key === 'Escape') cancelEdit(selectedApp.id);
-                    }}
-                  />
-                ) : (
-                  <span onDoubleClick={() => setApplications(applications.map(a => a.id === selectedApp.id ? { ...a, editing: true } : a))}>
-                    {selectedApp.jobReqId || 'N/A'}
-                  </span>
-                )}
+                <div style={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {selectedApp.editing.jobReqId ? (
+                    <input
+                      type="text"
+                      value={selectedApp.editJobReqId ?? selectedApp.jobReqId}
+                      onChange={e => setApplications(applications.map(a => 
+                        a.id === selectedApp.id ? { ...a, editJobReqId: e.target.value } : a
+                      ))}
+                      style={{ flexGrow: 1, padding: '4px 8px' }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') saveEdit(selectedApp.id, 'jobReqId');
+                        if (e.key === 'Escape') cancelEdit(selectedApp.id, 'jobReqId');
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <span style={{ flexGrow: 1 }}>{selectedApp.jobReqId || 'N/A'}</span>
+                      <button
+                        onClick={() => setApplications(applications.map(a => 
+                          a.id === selectedApp.id ? {
+                            ...a,
+                            editing: { ...a.editing, jobReqId: true }
+                          } : a
+                        ))}
+                        style={{
+                          padding: '4px 8px',
+                          background: '#3498db',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Edit
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
-              <div style={{ marginBottom: 16 }}>
+              {/* Job Link Section */}
+              <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <label>Job Listing Link:</label>{' '}
-                {selectedApp.editing ? (
-                  <input
-                    type="text"
-                    value={selectedApp.editJobLink ?? selectedApp.jobLink}
-                    onChange={e => setApplications(applications.map(a => 
-                      a.id === selectedApp.id ? { ...a, editJobLink: e.target.value } : a
-                    ))}
-                    style={{ width: '100%', marginBottom: 5 }}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') saveEdit(selectedApp.id);
-                      if (e.key === 'Escape') cancelEdit(selectedApp.id);
-                    }}
-                  />
-                ) : (
-                  <a
-                    href={selectedApp.jobLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onDoubleClick={() => setApplications(applications.map(a => 
-                      a.id === selectedApp.id ? { ...a, editing: true } : a
-                    ))}
-                  >
-                    {selectedApp.jobLink ? new URL(selectedApp.jobLink).hostname : 'N/A'}
-                  </a>
-                )}
+                <div style={{ flexGrow: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {selectedApp.editing.jobLink ? (
+                    <input
+                      type="text"
+                      value={selectedApp.editJobLink ?? selectedApp.jobLink}
+                      onChange={e => setApplications(applications.map(a => 
+                        a.id === selectedApp.id ? { ...a, editJobLink: e.target.value } : a
+                      ))}
+                      style={{ flexGrow: 1, padding: '4px 8px' }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') saveEdit(selectedApp.id, 'jobLink');
+                        if (e.key === 'Escape') cancelEdit(selectedApp.id, 'jobLink');
+                      }}
+                    />
+                  ) : (
+                    <>
+                      <a 
+                        href={selectedApp.jobLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{ flexGrow: 1 }}
+                      >
+                        {selectedApp.jobLink ? new URL(selectedApp.jobLink).hostname : 'N/A'}
+                      </a>
+                      <button
+                        onClick={() => setApplications(applications.map(a => 
+                          a.id === selectedApp.id ? {
+                            ...a,
+                            editing: { ...a.editing, jobLink: true }
+                          } : a
+                        ))}
+                        style={{
+                          padding: '4px 8px',
+                          background: '#3498db',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Edit
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
 
               <Checklist
@@ -373,20 +580,22 @@ function App() {
                     a.id === selectedApp.id ? { ...a, checklist: updated } : a
                   ));
                 }}
-                onProgressUpdate={() => {}}
+                onProgressUpdate={() => {
+                  // Force re-render of the sidebar items
+                  setApplications([...applications]);
+                }}
               />
 
               {/* File Attachments */}
-              {/* Cover Letter Section */}
               <div style={{ marginBottom: 16, marginTop: 24 }}>
                 <label>Cover Letter:</label>{' '}
                 {selectedApp.coverLetter ? (
                   <a
-                    href={selectedApp.coverLetter.url}
+                    href={selectedApp.coverLetter}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    {selectedApp.coverLetter.name}
+                    View Cover Letter
                   </a>
                 ) : (
                   <span>No file uploaded</span>
@@ -399,13 +608,7 @@ function App() {
                     if (file) {
                       const fileURL = URL.createObjectURL(file);
                       setApplications(applications.map(a =>
-                        a.id === selectedApp.id ? {
-                          ...a,
-                          coverLetter: {
-                            url: fileURL,
-                            name: file.name
-                          }
-                        } : a
+                        a.id === selectedApp.id ? { ...a, coverLetter: fileURL } : a
                       ));
                     }
                   }}
@@ -413,16 +616,15 @@ function App() {
                 />
               </div>
 
-              {/* Resume Section */}
               <div style={{ marginBottom: 16 }}>
                 <label>Resume:</label>{' '}
                 {selectedApp.resume ? (
                   <a
-                    href={selectedApp.resume.url}
+                    href={selectedApp.resume}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    {selectedApp.resume.name}
+                    View Resume
                   </a>
                 ) : (
                   <span>No file uploaded</span>
@@ -435,147 +637,12 @@ function App() {
                     if (file) {
                       const fileURL = URL.createObjectURL(file);
                       setApplications(applications.map(a =>
-                        a.id === selectedApp.id ? {
-                          ...a,
-                          resume: {
-                            url: fileURL,
-                            name: file.name
-                          }
-                        } : a
+                        a.id === selectedApp.id ? { ...a, resume: fileURL } : a
                       ));
                     }
                   }}
                   style={{ display: 'block', marginTop: 8 }}
                 />
-              </div>
-
-              {/* Interview Location Section */}
-              <div style={{ marginBottom: 16 }}>
-                <h3>Interview Details</h3>
-                
-                <div style={{ marginBottom: 12 }}>
-                  <label>Interview Type:</label>{' '}
-                  <select
-                    value={selectedApp.interview?.locationType || 'remote'}
-                    onChange={e => setApplications(applications.map(a =>
-                      a.id === selectedApp.id
-                        ? {
-                            ...a,
-                            interview: {
-                              ...a.interview,
-                              locationType: e.target.value,
-                              location: {
-                                remote: '',
-                                inPerson: ''
-                              }
-                            }
-                          }
-                        : a
-                    ))}
-                    style={{ marginLeft: 8, padding: '4px 8px' }}
-                  >
-                    <option value="remote">Remote</option>
-                    <option value="inPerson">In Person</option>
-                  </select>
-                </div>
-
-                {selectedApp.interview?.locationType === 'remote' ? (
-                  <div>
-                    <label>Meeting Link:</label>
-                    <input
-                      type="url"
-                      placeholder="Paste video conference link (e.g., Zoom, Teams, etc.)"
-                      value={selectedApp.interview?.location?.remote || ''}
-                      onChange={e => setApplications(applications.map(a =>
-                        a.id === selectedApp.id
-                          ? {
-                              ...a,
-                              interview: {
-                                ...a.interview,
-                                location: {
-                                  ...a.interview.location,
-                                  remote: e.target.value
-                                }
-                              }
-                            }
-                          : a
-                      ))}
-                      style={{ 
-                        width: '100%', 
-                        padding: '8px',
-                        marginTop: 4,
-                        marginBottom: 8,
-                        borderRadius: 4,
-                        border: '1px solid #ccc'
-                      }}
-                    />
-                    {selectedApp.interview?.location?.remote && (
-                      <a
-                        href={selectedApp.interview.location.remote}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="interview-link"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          color: '#3498db',
-                          textDecoration: 'none',
-                          marginTop: 4
-                        }}
-                      >
-                        Join Meeting →
-                      </a>
-                    )}
-                  </div>
-                ) : (
-                  <div>
-                    <label>Office Address:</label>
-                    <input
-                      type="text"
-                      placeholder="Enter interview location address"
-                      value={selectedApp.interview?.location?.inPerson || ''}
-                      onChange={e => setApplications(applications.map(a =>
-                        a.id === selectedApp.id
-                          ? {
-                              ...a,
-                              interview: {
-                                ...a.interview,
-                                location: {
-                                  ...a.interview.location,
-                                  inPerson: e.target.value
-                                }
-                              }
-                            }
-                          : a
-                      ))}
-                      style={{ 
-                        width: '100%', 
-                        padding: '8px',
-                        marginTop: 4,
-                        marginBottom: 8,
-                        borderRadius: 4,
-                        border: '1px solid #ccc'
-                      }}
-                    />
-                    {selectedApp.interview?.location?.inPerson && (
-                      <a
-                        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedApp.interview.location.inPerson)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="interview-link"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          color: '#3498db',
-                          textDecoration: 'none',
-                          marginTop: 4
-                        }}
-                      >
-                        Open in Google Maps →
-                      </a>
-                    )}
-                  </div>
-                )}
               </div>
 
               {/* Notes Section */}
@@ -599,6 +666,165 @@ function App() {
                     resize: 'vertical'
                   }}
                 />
+              </div>
+
+              {/* Interview Details Section */}
+              <div style={{ marginBottom: 16 }}>
+                <h3>Interview Details</h3>
+                
+                <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: '1fr 1fr' }}>
+                  <div>
+                    <label>Interview Date:</label>
+                    <input
+                      type="date"
+                      value={selectedApp.interview?.date || ''}
+                      onChange={e => setApplications(applications.map(a =>
+                        a.id === selectedApp.id ? {
+                          ...a,
+                          interview: {
+                            ...a.interview || {},
+                            date: e.target.value
+                          }
+                        } : a
+                      ))}
+                      style={{ width: '100%', padding: '8px', marginTop: '4px' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label>Interview Time:</label>
+                    <input
+                      type="time"
+                      value={selectedApp.interview?.time || ''}
+                      onChange={e => setApplications(applications.map(a =>
+                        a.id === selectedApp.id ? {
+                          ...a,
+                          interview: {
+                            ...a.interview || {},
+                            time: e.target.value
+                          }
+                        } : a
+                      ))}
+                      style={{ width: '100%', padding: '8px', marginTop: '4px' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '16px' }}>
+                  <label>Interview Type:</label>
+                  <select
+                    value={selectedApp.interview?.locationType || 'remote'}
+                    onChange={e => setApplications(applications.map(a =>
+                      a.id === selectedApp.id ? {
+                        ...a,
+                        interview: {
+                          ...a.interview || {},
+                          locationType: e.target.value,
+                          location: {
+                            remote: '',
+                            inPerson: ''
+                          }
+                        }
+                      } : a
+                    ))}
+                    style={{ width: '100%', padding: '8px', marginTop: '4px' }}
+                  >
+                    <option value="remote">Remote</option>
+                    <option value="inPerson">In Person</option>
+                  </select>
+                </div>
+
+                {/* Location Input based on type */}
+                <div style={{ marginTop: '16px' }}>
+                  {selectedApp.interview?.locationType === 'remote' ? (
+                    <div>
+                      <label>Meeting Link:</label>
+                      <input
+                        type="url"
+                        placeholder="Paste video conference link (e.g., Zoom, Teams)"
+                        value={selectedApp.interview?.location?.remote || ''}
+                        onChange={e => setApplications(applications.map(a =>
+                          a.id === selectedApp.id ? {
+                            ...a,
+                            interview: {
+                              ...a.interview || {},
+                              location: {
+                                ...a.interview?.location || {},
+                                remote: e.target.value
+                              }
+                            }
+                          } : a
+                        ))}
+                        style={{ width: '100%', padding: '8px', marginTop: '4px', marginBottom: '8px' }}
+                      />
+                      {selectedApp.interview?.location?.remote && (
+                        <a
+                          href={selectedApp.interview.location.remote}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            color: '#3498db',
+                            textDecoration: 'none',
+                            marginTop: '8px'
+                          }}
+                        >
+                          Join Meeting →
+                        </a>
+                      )}
+                    </div>
+                  ) : (
+                    <div>
+                      <label>Office Address:</label>
+                      <input
+                        type="text"
+                        placeholder="Enter interview location address"
+                        value={selectedApp.interview?.location?.inPerson || ''}
+                        onChange={e => setApplications(applications.map(a =>
+                          a.id === selectedApp.id ? {
+                            ...a,
+                            interview: {
+                              ...a.interview || {},
+                              location: {
+                                ...a.interview?.location || {},
+                                inPerson: e.target.value
+                              }
+                            }
+                          } : a
+                        ))}
+                        style={{ width: '100%', padding: '8px', marginTop: '4px', marginBottom: '8px' }}
+                      />
+                      {selectedApp.interview?.location?.inPerson && (
+                        <a
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedApp.interview.location.inPerson)}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            color: '#3498db',
+                            textDecoration: 'none',
+                            marginTop: '8px'
+                          }}
+                        >
+                          Open in Google Maps →
+                        </a>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Interview Actions */}
+              <div className="interview-actions">
+                <button 
+                  onClick={() => generateInterviewICS(selectedApp)}
+                  disabled={!selectedApp.interview?.date || !selectedApp.interview?.time}
+                  className="calendar-export-btn"
+                >
+                  Add to Calendar
+                </button>
               </div>
             </>
           ) : (
