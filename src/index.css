@@ -261,13 +261,13 @@ body {
   --bg:            #ffffff;
   --text:          #333333;          /* Dark text for main content */
   --sidebar-bg:    #f5f7fa;          /* Slightly cooler background */
-  --job-bg:        #e9ecef;          /* Subtle container background */
+  --job-bg:        #c7e0f9;          /* Subtle container background */
   --job-hover:     #dee2e6;          /* Slightly darker on hover */
   --job-selected:  #bde0fe;          /* Softer blue for selected state */
   --progress-bar:  #3498db;          /* Bright blue for progress */
   --drag-shadow:   rgba(0, 0, 0, 0.1);
-  --sidebar-text:  #ffffff;          /* White text for sidebar */
-  --sidebar-heading: #ffffff;
+  --sidebar-text:  #000000;          /* White text for sidebar */
+  --sidebar-heading: #000000;
   --sidebar-muted: rgba(255, 255, 255, 0.7);
   transition: all 0.3s ease;
 }

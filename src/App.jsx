@@ -7,6 +7,7 @@ import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, us
 import { SortableContext, arrayMove, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import DraggableJob from './components/DraggableJob';
 import { generateInterviewICS } from './utils/calendarExport';
+import { Editor } from '@tinymce/tinymce-react';
 import './index.css';
 
 const STORAGE_KEY = 'jobApplications';
@@ -71,7 +72,8 @@ function App() {
             remote: '',
             inPerson: ''
           }
-        }
+        },
+        interviewRounds: []
       };
       return [exampleApp];
     }
@@ -114,6 +116,14 @@ function App() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(applications));
   }, [applications]);
 
+  // Load applications from localStorage on app start
+  useEffect(() => {
+    const savedApplications = localStorage.getItem('applications');
+    if (savedApplications) {
+      setApplications(JSON.parse(savedApplications));
+    }
+  }, []);
+
   /* job CRUD */
   const addJob = () => {
     if (!newJob.title || !newJob.company || !newJob.date) {
@@ -133,7 +143,8 @@ function App() {
         company: false,
         jobReqId: false,
         jobLink: false
-      }
+      },
+      interviewRounds: []
     };
     setApplications([...applications, app]);
     setSelectedJobId(app.id);
@@ -236,6 +247,85 @@ function App() {
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     saveAs(blob, 'JobApplications.xlsx');
+  };
+
+  const exportToJSON = () => {
+    const dataStr = JSON.stringify(applications);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.download = `job-applications-${new Date().toISOString().split('T')[0]}.json`;
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importFromJSON = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const importedData = JSON.parse(e.target.result);
+          setApplications(importedData);
+        } catch (error) {
+          alert('Error importing file. Please make sure it is a valid JSON file.');
+        }
+      };
+      reader.readAsText(file);
+    }
+  };
+
+  const addInterviewRound = (appId) => {
+    setApplications(applications.map(app => 
+      app.id === appId ? {
+        ...app,
+        interviewRounds: [...(app.interviewRounds || []), {
+          date: '',
+          time: '',
+          locationType: 'remote',
+          location: { remote: '', inPerson: '' },
+          interviewerName: '',
+          interviewerContact: ''
+        }]
+      } : app
+    ));
+  };
+
+  const deleteInterviewRound = (appId, roundIndex) => {
+    setApplications(applications.map(app => 
+      app.id === appId ? {
+        ...app,
+        interviewRounds: app.interviewRounds.filter((_, idx) => idx !== roundIndex)
+      } : app
+    ));
+  };
+
+  // Add functionality to persist file uploads
+  const handleFileUpload = (e, appId, fileType) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const fileData = reader.result;
+      setApplications(applications.map(app =>
+        app.id === appId ? {
+          ...app,
+          [fileType]: fileData
+        } : app
+      ));
+
+      // Persist the file data to localStorage
+      const updatedApplications = applications.map(app =>
+        app.id === appId ? {
+          ...app,
+          [fileType]: fileData
+        } : app
+      );
+      localStorage.setItem('applications', JSON.stringify(updatedApplications));
+    };
+    reader.readAsDataURL(file);
   };
 
   const selectedApp = applications.find(a => a.id === selectedJobId);
@@ -377,6 +467,47 @@ function App() {
           Toggle {darkMode ? 'Light' : 'Dark'} Mode
         </button>
 
+        {/* Backup and Restore */}
+        <div style={{ marginTop: 16 }}>
+          <button
+            onClick={exportToJSON}
+            style={{
+              padding: '10px 20px',
+              background: '#2ecc71',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer',
+              marginBottom: 8,
+              width: '100%'
+            }}
+          >
+            Backup Applications
+          </button>
+          
+          <input
+            type="file"
+            accept=".json"
+            onChange={importFromJSON}
+            style={{ display: 'none' }}
+            id="import-json"
+          />
+          <button
+            onClick={() => document.getElementById('import-json').click()}
+            style={{
+              padding: '10px 20px',
+              background: '#3498db',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer',
+              width: '100%'
+            }}
+          >
+            Restore from Backup
+          </button>
+        </div>
+
         {/* Export to spreadsheet */}
         <div style={{ marginTop: 16 }}>
           <button
@@ -392,6 +523,40 @@ function App() {
           >
             Export to Spreadsheet
           </button>
+        </div>
+
+        {/* Export to JSON */}
+        <div style={{ marginTop: 16 }}>
+          <button
+            onClick={exportToJSON}
+            style={{
+              padding: '10px 20px',
+              background: '#2ecc71',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer'
+            }}
+          >
+            Export to JSON
+          </button>
+        </div>
+
+        {/* Import from JSON */}
+        <div style={{ marginTop: 16 }}>
+          <input
+            type="file"
+            accept=".json"
+            onChange={importFromJSON}
+            style={{
+              padding: '10px 20px',
+              background: '#e74c3c',
+              color: '#fff',
+              border: 'none',
+              borderRadius: 4,
+              cursor: 'pointer'
+            }}
+          />
         </div>
       </motion.div>
 
@@ -622,7 +787,7 @@ function App() {
               />
 
               {/* File Attachments */}
-              <div style={{ marginBottom: 16, marginTop: 24 }}>
+              <div style={{ marginBottom: 16 }}>
                 <label>Cover Letter:</label>{' '}
                 {selectedApp.coverLetter ? (
                   <a
@@ -638,15 +803,7 @@ function App() {
                 <input
                   type="file"
                   accept=".pdf,.doc,.docx"
-                  onChange={e => {
-                    const file = e.target.files[0];
-                    if (file) {
-                      const fileURL = URL.createObjectURL(file);
-                      setApplications(applications.map(a =>
-                        a.id === selectedApp.id ? { ...a, coverLetter: fileURL } : a
-                      ));
-                    }
-                  }}
+                  onChange={e => handleFileUpload(e, selectedApp.id, 'coverLetter')}
                   style={{ display: 'block', marginTop: 8 }}
                 />
               </div>
@@ -667,188 +824,211 @@ function App() {
                 <input
                   type="file"
                   accept=".pdf,.doc,.docx"
-                  onChange={e => {
-                    const file = e.target.files[0];
-                    if (file) {
-                      const fileURL = URL.createObjectURL(file);
-                      setApplications(applications.map(a =>
-                        a.id === selectedApp.id ? { ...a, resume: fileURL } : a
-                      ));
-                    }
-                  }}
+                  onChange={e => handleFileUpload(e, selectedApp.id, 'resume')}
                   style={{ display: 'block', marginTop: 8 }}
-                />
-              </div>
-
-              {/* Notes Section */}
-              <div style={{ marginBottom: 16 }}>
-                <label>Notes:</label>
-                <textarea
-                  value={selectedApp.notes}
-                  onChange={e =>
-                    setApplications(applications.map(a =>
-                      a.id === selectedApp.id ? { ...a, notes: e.target.value } : a
-                    ))
-                  }
-                  placeholder="Add notes about this application..."
-                  style={{
-                    width: '100%',
-                    height: '100px',
-                    padding: '8px',
-                    fontSize: '0.9rem',
-                    borderRadius: '4px',
-                    border: '1px solid #ccc',
-                    resize: 'vertical'
-                  }}
                 />
               </div>
 
               {/* Interview Details Section */}
               <div style={{ marginBottom: 16 }}>
                 <h3>Interview Details</h3>
-                
-                <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: '1fr 1fr' }}>
-                  <div>
-                    <label>Interview Date:</label>
-                    <input
-                      type="date"
-                      value={selectedApp.interview?.date || ''}
-                      onChange={e => setApplications(applications.map(a =>
-                        a.id === selectedApp.id ? {
-                          ...a,
-                          interview: {
-                            ...a.interview || {},
-                            date: e.target.value
-                          }
-                        } : a
-                      ))}
-                      style={{ width: '100%', padding: '8px', marginTop: '4px' }}
-                    />
-                  </div>
 
-                  <div>
-                    <label>Interview Time:</label>
-                    <input
-                      type="time"
-                      value={selectedApp.interview?.time || ''}
-                      onChange={e => setApplications(applications.map(a =>
-                        a.id === selectedApp.id ? {
-                          ...a,
-                          interview: {
-                            ...a.interview || {},
-                            time: e.target.value
-                          }
-                        } : a
-                      ))}
-                      style={{ width: '100%', padding: '8px', marginTop: '4px' }}
-                    />
-                  </div>
-                </div>
+                {selectedApp.interviewRounds && selectedApp.interviewRounds.map((round, idx) => (
+                  <div key={idx} style={{ marginBottom: '16px' }}>
+                    <h4>Interview Round {idx + 1}</h4>
 
-                <div style={{ marginTop: '16px' }}>
-                  <label>Interview Type:</label>
-                  <select
-                    value={selectedApp.interview?.locationType || 'remote'}
-                    onChange={e => setApplications(applications.map(a =>
-                      a.id === selectedApp.id ? {
-                        ...a,
-                        interview: {
-                          ...a.interview || {},
-                          locationType: e.target.value,
-                          location: {
-                            remote: '',
-                            inPerson: ''
-                          }
-                        }
-                      } : a
-                    ))}
-                    style={{ width: '100%', padding: '8px', marginTop: '4px' }}
-                  >
-                    <option value="remote">Remote</option>
-                    <option value="inPerson">In Person</option>
-                  </select>
-                </div>
+                    <div style={{ display: 'grid', gap: '16px', gridTemplateColumns: '1fr 1fr' }}>
+                      <div>
+                        <label>Interview Date:</label>
+                        <input
+                          type="date"
+                          value={round.date || ''}
+                          onChange={e => setApplications(applications.map(a =>
+                            a.id === selectedApp.id ? {
+                              ...a,
+                              interviewRounds: a.interviewRounds.map((r, i) => i === idx ? { ...r, date: e.target.value } : r)
+                            } : a
+                          ))}
+                          style={{ width: '100%', padding: '8px', marginTop: '4px' }}
+                        />
+                      </div>
 
-                {/* Location Input based on type */}
-                <div style={{ marginTop: '16px' }}>
-                  {selectedApp.interview?.locationType === 'remote' ? (
-                    <div>
-                      <label>Meeting Link:</label>
-                      <input
-                        type="url"
-                        placeholder="Paste video conference link (e.g., Zoom, Teams)"
-                        value={selectedApp.interview?.location?.remote || ''}
+                      <div>
+                        <label>Interview Time:</label>
+                        <input
+                          type="time"
+                          value={round.time || ''}
+                          onChange={e => {
+                            const timeValue = e.target.value;
+                            const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
+                            if (timeRegex.test(timeValue)) {
+                              setApplications(applications.map(a =>
+                                a.id === selectedApp.id ? {
+                                  ...a,
+                                  interviewRounds: a.interviewRounds.map((r, i) => i === idx ? { ...r, time: timeValue } : r)
+                                } : a
+                              ));
+                            } else {
+                              alert('Please enter a valid time in HH:MM format.');
+                            }
+                          }}
+                          style={{ width: '100%', padding: '8px', marginTop: '4px' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div style={{ marginTop: '16px' }}>
+                      <label>Interview Type:</label>
+                      <select
+                        value={round.locationType || 'remote'}
                         onChange={e => setApplications(applications.map(a =>
                           a.id === selectedApp.id ? {
                             ...a,
-                            interview: {
-                              ...a.interview || {},
-                              location: {
-                                ...a.interview?.location || {},
-                                remote: e.target.value
-                              }
-                            }
+                            interviewRounds: a.interviewRounds.map((r, i) => i === idx ? { ...r, locationType: e.target.value } : r)
                           } : a
                         ))}
-                        style={{ width: '100%', padding: '8px', marginTop: '4px', marginBottom: '8px' }}
-                      />
-                      {selectedApp.interview?.location?.remote && (
-                        <a
-                          href={selectedApp.interview.location.remote}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            color: '#3498db',
-                            textDecoration: 'none',
-                            marginTop: '8px'
-                          }}
-                        >
-                          Join Meeting →
-                        </a>
-                      )}
+                        style={{ width: '100%', padding: '8px', marginTop: '4px' }}
+                      >
+                        <option value="remote">Remote</option>
+                        <option value="inPerson">In Person</option>
+                      </select>
                     </div>
-                  ) : (
-                    <div>
-                      <label>Office Address:</label>
+
+                    {round.locationType === 'remote' ? (
+                      <div style={{ marginTop: '16px' }}>
+                        <label>Meeting Link:</label>
+                        <input
+                          type="url"
+                          placeholder="Paste video conference link (e.g., Zoom, Teams)"
+                          value={round.location?.remote || ''}
+                          onChange={e => setApplications(applications.map(a =>
+                            a.id === selectedApp.id ? {
+                              ...a,
+                              interviewRounds: a.interviewRounds.map((r, i) => i === idx ? {
+                                ...r,
+                                location: { ...r.location, remote: e.target.value }
+                              } : r)
+                            } : a
+                          ))}
+                          style={{ width: '100%', padding: '8px', marginTop: '4px', marginBottom: '8px' }}
+                        />
+                        {round.location?.remote && (
+                          <a
+                            href={round.location.remote}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              color: '#3498db',
+                              textDecoration: 'none',
+                              marginTop: '8px'
+                            }}
+                          >
+                            Join Meeting →
+                          </a>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: '16px' }}>
+                        <label>Office Address:</label>
+                        <input
+                          type="text"
+                          placeholder="Enter interview location address"
+                          value={round.location?.inPerson || ''}
+                          onChange={e => setApplications(applications.map(a =>
+                            a.id === selectedApp.id ? {
+                              ...a,
+                              interviewRounds: a.interviewRounds.map((r, i) => i === idx ? {
+                                ...r,
+                                location: { ...r.location, inPerson: e.target.value }
+                              } : r)
+                            } : a
+                          ))}
+                          style={{ width: '100%', padding: '8px', marginTop: '4px', marginBottom: '8px' }}
+                        />
+                        {round.location?.inPerson && (
+                          <a
+                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(round.location.inPerson)}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              color: '#3498db',
+                              textDecoration: 'none',
+                              marginTop: '8px'
+                            }}
+                          >
+                            Open in Google Maps →
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    <div style={{ marginTop: '16px' }}>
+                      <label>Interviewer Name:</label>
                       <input
                         type="text"
-                        placeholder="Enter interview location address"
-                        value={selectedApp.interview?.location?.inPerson || ''}
+                        placeholder="Enter interviewer's name"
+                        value={round.interviewerName || ''}
                         onChange={e => setApplications(applications.map(a =>
                           a.id === selectedApp.id ? {
                             ...a,
-                            interview: {
-                              ...a.interview || {},
-                              location: {
-                                ...a.interview?.location || {},
-                                inPerson: e.target.value
-                              }
-                            }
+                            interviewRounds: a.interviewRounds.map((r, i) => i === idx ? { ...r, interviewerName: e.target.value } : r)
                           } : a
                         ))}
-                        style={{ width: '100%', padding: '8px', marginTop: '4px', marginBottom: '8px' }}
+                        style={{ width: '100%', padding: '8px', marginTop: '4px' }}
                       />
-                      {selectedApp.interview?.location?.inPerson && (
-                        <a
-                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(selectedApp.interview.location.inPerson)}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            color: '#3498db',
-                            textDecoration: 'none',
-                            marginTop: '8px'
-                          }}
-                        >
-                          Open in Google Maps →
-                        </a>
-                      )}
                     </div>
-                  )}
-                </div>
+
+                    <div style={{ marginTop: '16px' }}>
+                      <label>Interviewer Contact:</label>
+                      <input
+                        type="text"
+                        placeholder="Enter interviewer's contact information"
+                        value={round.interviewerContact || ''}
+                        onChange={e => setApplications(applications.map(a =>
+                          a.id === selectedApp.id ? {
+                            ...a,
+                            interviewRounds: a.interviewRounds.map((r, i) => i === idx ? { ...r, interviewerContact: e.target.value } : r)
+                          } : a
+                        ))}
+                        style={{ width: '100%', padding: '8px', marginTop: '4px' }}
+                      />
+                    </div>
+
+                    <button
+                      onClick={() => deleteInterviewRound(selectedApp.id, idx)}
+                      style={{
+                        marginTop: '12px',
+                        padding: '6px 10px',
+                        background: '#e74c3c',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 4,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Delete Round
+                    </button>
+                  </div>
+                ))}
+
+                <button
+                  onClick={() => addInterviewRound(selectedApp.id)}
+                  style={{
+                    marginTop: '16px',
+                    padding: '10px 20px',
+                    background: '#2ecc71',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 4,
+                    cursor: 'pointer'
+                  }}
+                >
+                  Add Interview Round
+                </button>
               </div>
 
               {/* Interview Actions */}
