@@ -1,0 +1,119 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+:root {
+  --bg: #0b0d12;
+  --surface: #171a21;
+  --surface-2: #1e222b;
+  --border: #2a2f3a;
+  --border-soft: rgba(42, 47, 58, 0.6);
+  --text: #e8e6e1;
+  --text-muted: #8b92a3;
+}
+
+html.light {
+  --bg: #f3f4f7;
+  --surface: #ffffff;
+  --surface-2: #f0f1f5;
+  --border: #e1e4ea;
+  --border-soft: rgba(225, 228, 234, 0.8);
+  --text: #171a21;
+  --text-muted: #6b7280;
+}
+
+body {
+  @apply font-body antialiased;
+  background: var(--bg);
+  color: var(--text);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+/* ───────── Custom scrollbar ───────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 999px;
+}
+
+/* ───────── Signature element: the signal bar ─────────
+   A segmented readout (10 ticks) used in place of a plain progress bar.
+   Filled ticks glow faintly; the active tick pulses when status is "live". */
+.signal-bar {
+  display: flex;
+  gap: 3px;
+  align-items: flex-end;
+  height: 14px;
+}
+
+.signal-tick {
+  flex: 1;
+  border-radius: 1px;
+  background: var(--border);
+  transition: background-color 0.3s ease, box-shadow 0.3s ease, height 0.2s ease;
+}
+
+.signal-tick.filled {
+  background: var(--signal-color, theme('colors.signal.amber'));
+  box-shadow: 0 0 6px -1px var(--signal-color, theme('colors.signal.amber'));
+}
+
+.signal-tick:nth-child(odd) {
+  height: 70%;
+}
+.signal-tick:nth-child(even) {
+  height: 100%;
+}
+
+/* Status pulse dot for "Interviewing" (active/live state) */
+.pulse-dot {
+  position: relative;
+}
+.pulse-dot::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 999px;
+  background: currentColor;
+  opacity: 0.35;
+  animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.5;
+  }
+  70% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+/* Drag state */
+.dragging-card {
+  opacity: 0.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot::after,
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

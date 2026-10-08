@@ -1,0 +1,9 @@
+services:
+  dossier:
+    build: .
+    container_name: dossier
+    ports:
+      - "4000:4000"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
