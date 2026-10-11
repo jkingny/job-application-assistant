@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { migrateApplications } from './checklist.js'
 
 // In production this app is served by the same server as the API, so a
 // relative path works. Override with VITE_API_BASE for local dev, where the
@@ -59,7 +60,7 @@ export function useServerSync(applications, setApplications) {
         lastKnownUpdatedAt.current = updatedAt || 0
         if (serverApps && serverApps.length > 0) {
           skipNextPush.current = true
-          setApplications(serverApps)
+          setApplications(migrateApplications(serverApps))
         } else if (applications.length > 0) {
           pushServerState(applications)
             .then(({ updatedAt: newUpdatedAt }) => {
@@ -107,7 +108,7 @@ export function useServerSync(applications, setApplications) {
           if (updatedAt && updatedAt !== lastKnownUpdatedAt.current) {
             lastKnownUpdatedAt.current = updatedAt
             skipNextPush.current = true
-            setApplications(serverApps)
+            setApplications(migrateApplications(serverApps))
           }
           setBoth('synced')
         })

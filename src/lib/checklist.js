@@ -47,3 +47,38 @@ export function calculateProgress(checklist) {
   })
   return total === 0 ? 0 : Math.round((completed / total) * 100)
 }
+
+// Brings a stored checklist up to date with the current defaults. Applications
+// saved under an older (or different) checklist keep their checked-off items
+// (matched by task text) but pick up any groups/tasks they were missing.
+export function migrateChecklist(stored) {
+  const fresh = defaultChecklist()
+  const doneByText = new Set()
+  if (stored && typeof stored === 'object') {
+    Object.values(stored).forEach((group) => {
+      if (!group || !Array.isArray(group.tasks)) return
+      group.tasks.forEach((t) => {
+        if (t && t.done && typeof t.text === 'string') doneByText.add(t.text.trim().toLowerCase())
+      })
+    })
+  }
+  Object.values(fresh).forEach((group) => {
+    group.tasks.forEach((t) => {
+      if (doneByText.has(t.text.trim().toLowerCase())) t.done = true
+    })
+  })
+  return fresh
+}
+
+// Normalizes applications loaded from storage, a backup file, or the sync server.
+export function migrateApplications(apps) {
+  if (!Array.isArray(apps)) return []
+  return apps.map((a) => ({
+    ...a,
+    checklist: migrateChecklist(a.checklist),
+    links: Array.isArray(a.links) ? a.links : [],
+    interviewRounds: Array.isArray(a.interviewRounds) ? a.interviewRounds : [],
+    salaryRange: a.salaryRange || '',
+    notes: a.notes || '',
+  }))
+}

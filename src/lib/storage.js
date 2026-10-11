@@ -1,12 +1,13 @@
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
+import { migrateApplications } from './checklist.js'
 
 export const STORAGE_KEY = 'jobApplications'
 
 export function loadApplications() {
   try {
     const saved = localStorage.getItem(STORAGE_KEY)
-    return saved ? JSON.parse(saved) : []
+    return saved ? migrateApplications(JSON.parse(saved)) : []
   } catch {
     return []
   }
@@ -29,7 +30,7 @@ export function importFromJSON(file) {
       try {
         const parsed = JSON.parse(e.target.result)
         if (!Array.isArray(parsed)) throw new Error('Not an array')
-        resolve(parsed)
+        resolve(migrateApplications(parsed))
       } catch {
         reject(new Error('That file doesn\u2019t look like a valid backup.'))
       }
